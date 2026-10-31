@@ -1,0 +1,6 @@
+{
+  "name": "MemeChamp",
+  "description": "Multiplayer Meme Battle Multiplier Game with real-time faction competition, rising crash multipliers, and virtual credits.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

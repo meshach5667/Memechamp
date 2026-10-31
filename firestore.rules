@@ -1,0 +1,160 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny all unknown paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Core Primitives ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        (request.auth.token.email != null && request.auth.token.email == 'meshachzakumi@gmail.com' && request.auth.token.email_verified == true)
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Entity Validators ---
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'username', 'credits', 'wins', 'losses', 'gamesPlayed']) &&
+             data.keys().hasOnly(['uid', 'username', 'displayName', 'avatar', 'credits', 'wins', 'losses', 'gamesPlayed', 'highestMultiplier', 'favoriteFaction', 'role', 'createdAt', 'updatedAt']) &&
+             data.uid == request.auth.uid &&
+             data.username is string && data.username.size() >= 3 && data.username.size() <= 32 &&
+             data.credits is number && data.credits >= 0 &&
+             data.wins is number && data.wins >= 0 &&
+             data.losses is number && data.losses >= 0 &&
+             data.gamesPlayed is number && data.gamesPlayed >= 0 &&
+             (!('role' in data) || data.role in ['player', 'admin']);
+    }
+
+    function isValidBet(data, roundId) {
+      return data.keys().hasAll(['id', 'roundId', 'uid', 'faction', 'amount', 'status']) &&
+             data.keys().hasOnly(['id', 'roundId', 'uid', 'username', 'faction', 'amount', 'status', 'cashedOutAt', 'payout', 'createdAt']) &&
+             data.roundId == roundId &&
+             data.uid == request.auth.uid &&
+             data.faction is string && data.faction.size() > 0 && data.faction.size() <= 64 &&
+             data.amount is number && data.amount > 0 && data.amount <= 1000000 &&
+             data.status in ['active', 'cashed_out', 'crashed'];
+    }
+
+    function isValidActivity(data) {
+      return data.keys().hasAll(['id', 'type', 'message']) &&
+             data.keys().hasOnly(['id', 'type', 'message', 'username', 'faction', 'multiplier', 'amount', 'createdAt']) &&
+             data.type in ['join', 'cashout', 'crash', 'round_start', 'reward'] &&
+             data.message is string && data.message.size() <= 256;
+    }
+
+    // --- Collection Rules ---
+
+    // Admin collection
+    match /admins/{adminId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isOwner(userId) && isValidUser(incoming()) && incoming().credits <= 10000;
+      allow update: if isOwner(userId) && isValidUser(incoming()) && (
+        isAdmin() ||
+        incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'avatar', 'favoriteFaction', 'updatedAt', 'wins', 'losses', 'gamesPlayed', 'highestMultiplier', 'credits'])
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Username reservation
+    match /usernames/{username} {
+      allow get: if true;
+      allow create: if isSignedIn() && isValidId(username) &&
+                    incoming().uid == request.auth.uid &&
+                    incoming().username == username &&
+                    !exists(/databases/$(database)/documents/usernames/$(username));
+      allow update, delete: if isAdmin();
+    }
+
+    // Game Rounds
+    match /rounds/{roundId} {
+      allow read: if true;
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+
+      // Bets subcollection inside round
+      match /bets/{betId} {
+        allow read: if true;
+        allow create: if isSignedIn() && isValidId(roundId) && isValidId(betId) &&
+                         isValidBet(incoming(), roundId) &&
+                         incoming().status == 'active' &&
+                         get(/databases/$(database)/documents/rounds/$(roundId)).data.state in ['WAITING', 'COUNTDOWN'];
+        allow update: if isSignedIn() && isValidId(roundId) && isValidId(betId) &&
+                         existing().uid == request.auth.uid &&
+                         (
+                           isAdmin() ||
+                           (
+                             existing().status == 'active' &&
+                             incoming().status == 'cashed_out' &&
+                             incoming().diff(existing()).affectedKeys().hasOnly(['status', 'cashedOutAt', 'payout']) &&
+                             get(/databases/$(database)/documents/rounds/$(roundId)).data.state == 'ACTIVE'
+                           )
+                         );
+        allow delete: if isAdmin();
+      }
+    }
+
+    // Real-time Activity Feed
+    match /activity/{activityId} {
+      allow read: if true;
+      allow create: if isSignedIn() && isValidId(activityId) && isValidActivity(incoming());
+      allow update, delete: if isAdmin();
+    }
+
+    // Memes collection
+    match /memes/{memeId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Credit Ledger (Append-only, strictly for owner or admin)
+    match /ledger/{ledgerId} {
+      allow get: if isSignedIn() && (existing().uid == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && isValidId(ledgerId) && incoming().uid == request.auth.uid &&
+                       incoming().type in ['signup_bonus', 'stake', 'payout', 'daily_reward', 'admin_grant'];
+      allow update, delete: if false; // Immutable!
+    }
+
+    // Notifications
+    match /notifications/{notificationId} {
+      allow get: if isSignedIn() && (existing().uid == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && isValidId(notificationId);
+      allow update: if isSignedIn() && existing().uid == request.auth.uid &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['read']);
+      allow delete: if isSignedIn() && existing().uid == request.auth.uid;
+    }
+  }
+}

@@ -1,0 +1,179 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Public and account profile for players with virtual credits statistics",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "username": { "type": "string", "maxLength": 32, "pattern": "^[a-zA-Z0-9_]{3,32}$" },
+        "displayName": { "type": "string", "maxLength": 64 },
+        "avatar": { "type": "string", "maxLength": 64 },
+        "credits": { "type": "number" },
+        "wins": { "type": "number" },
+        "losses": { "type": "number" },
+        "gamesPlayed": { "type": "number" },
+        "highestMultiplier": { "type": "number" },
+        "favoriteFaction": { "type": "string", "maxLength": 32 },
+        "role": { "type": "string", "enum": ["player", "admin"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "username", "credits", "wins", "losses", "gamesPlayed", "createdAt"]
+    },
+    "Username": {
+      "title": "Username Reservation",
+      "description": "Unique username claim mapping",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "username": { "type": "string", "maxLength": 32 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "username", "createdAt"]
+    },
+    "Round": {
+      "title": "Battle Round",
+      "description": "Real-time multiplayer meme battle round state",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64 },
+        "roundNumber": { "type": "number" },
+        "state": { "type": "string", "enum": ["WAITING", "COUNTDOWN", "ACTIVE", "CRASHED", "SETTLED"] },
+        "memeAId": { "type": "string", "maxLength": 64 },
+        "memeAName": { "type": "string", "maxLength": 64 },
+        "memeASupporters": { "type": "number" },
+        "memeAStaked": { "type": "number" },
+        "memeBId": { "type": "string", "maxLength": 64 },
+        "memeBName": { "type": "string", "maxLength": 64 },
+        "memeBSupporters": { "type": "number" },
+        "memeBStaked": { "type": "number" },
+        "multiplier": { "type": "number" },
+        "crashPoint": { "type": "number" },
+        "serverHash": { "type": "string", "maxLength": 128 },
+        "winningFaction": { "type": "string", "maxLength": 64 },
+        "aiCommentary": { "type": "string", "maxLength": 1000 },
+        "startedAt": { "type": "string", "format": "date-time" },
+        "crashedAt": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "roundNumber", "state", "multiplier", "createdAt"]
+    },
+    "Bet": {
+      "title": "Round Bet",
+      "description": "Player stake entry on a faction in a specific round",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64 },
+        "roundId": { "type": "string", "maxLength": 64 },
+        "uid": { "type": "string", "maxLength": 128 },
+        "username": { "type": "string", "maxLength": 32 },
+        "faction": { "type": "string", "maxLength": 64 },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["active", "cashed_out", "crashed"] },
+        "cashedOutAt": { "type": "number" },
+        "payout": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "roundId", "uid", "faction", "amount", "status", "createdAt"]
+    },
+    "Activity": {
+      "title": "Activity Event",
+      "description": "Live global game activity and social feed event",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64 },
+        "type": { "type": "string", "enum": ["join", "cashout", "crash", "round_start", "reward"] },
+        "message": { "type": "string", "maxLength": 256 },
+        "username": { "type": "string", "maxLength": 32 },
+        "faction": { "type": "string", "maxLength": 64 },
+        "multiplier": { "type": "number" },
+        "amount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "type", "message", "createdAt"]
+    },
+    "Meme": {
+      "title": "Meme Entity",
+      "description": "Meme character fighter in MemeChamp roster",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64 },
+        "name": { "type": "string", "maxLength": 64 },
+        "tagline": { "type": "string", "maxLength": 128 },
+        "category": { "type": "string", "enum": ["OG Classics", "Modern Brainrot", "Animal Legends", "Chad Tier"] },
+        "color": { "type": "string", "maxLength": 32 },
+        "wins": { "type": "number" },
+        "battles": { "type": "number" },
+        "popularity": { "type": "number" },
+        "description": { "type": "string", "maxLength": 512 }
+      },
+      "required": ["id", "name", "category", "wins", "battles", "popularity"]
+    },
+    "LedgerEntry": {
+      "title": "Credit Ledger Entry",
+      "description": "Immutable virtual credit transaction record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64 },
+        "uid": { "type": "string", "maxLength": 128 },
+        "type": { "type": "string", "enum": ["signup_bonus", "stake", "payout", "daily_reward", "admin_grant"] },
+        "amount": { "type": "number" },
+        "balanceAfter": { "type": "number" },
+        "roundId": { "type": "string", "maxLength": 64 },
+        "description": { "type": "string", "maxLength": 256 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "uid", "type", "amount", "balanceAfter", "createdAt"]
+    },
+    "Notification": {
+      "title": "User Notification",
+      "description": "Player in-game notification",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64 },
+        "uid": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 128 },
+        "message": { "type": "string", "maxLength": 512 },
+        "type": { "type": "string", "enum": ["win", "loss", "reward", "system"] },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "uid", "title", "message", "read", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile with game stats and virtual credit balance"
+    },
+    "/usernames/{username}": {
+      "schema": "Username",
+      "description": "Claimed unique usernames lookup map"
+    },
+    "/rounds/{roundId}": {
+      "schema": "Round",
+      "description": "Active and past meme battle multiplier game rounds"
+    },
+    "/rounds/{roundId}/bets/{betId}": {
+      "schema": "Bet",
+      "description": "Player bets placed on factions within a round"
+    },
+    "/activity/{activityId}": {
+      "schema": "Activity",
+      "description": "Real-time feed of player joins, cashouts, and round crash events"
+    },
+    "/memes/{memeId}": {
+      "schema": "Meme",
+      "description": "Meme roster with win/loss records and metadata"
+    },
+    "/ledger/{ledgerId}": {
+      "schema": "LedgerEntry",
+      "description": "Immutable ledger tracking all virtual credit transactions"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "Notifications delivered to users"
+    }
+  }
+}
